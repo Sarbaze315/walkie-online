@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#D9DDE1">
+<title>بی‌سیم</title>
+<style>
+  :root {
+    --body:#D9DDE1; --panel:#EEF0F2; --ink:#18212B; --muted:#586573; --edge:#B7BEC6;
+    --tx:#EE5A24; --rx:#0F9D8C; --lcd:#C8D9C3; --lcd-ink:#1D2B22; --lcd-dim:#5E7566;
+    --shadow:rgba(20,30,40,.28); --on-tx:#fff;
+    --font: system-ui, -apple-system, "Segoe UI", Tahoma, "Noto Sans Arabic", "Vazirmatn", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --body:#12171C; --panel:#1D242C; --ink:#E8EDF2; --muted:#93A0AD; --edge:#313A45;
+      --tx:#FF6A33; --rx:#27C2AF; --lcd:#16231D; --lcd-ink:#A9E7C1; --lcd-dim:#5F8E74;
+      --shadow:rgba(0,0,0,.55);
+    }
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; margin:0; }
+  body {
+    background:var(--body); color:var(--ink); font-family:var(--font);
+    padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+    user-select:none; -webkit-user-select:none; overscroll-behavior:none;
+  }
+  button, input { font:inherit; color:inherit; }
+  :focus-visible { outline:3px solid var(--rx); outline-offset:3px; }
+
+  .shell { max-width:420px; height:100%; margin:0 auto; display:flex; flex-direction:column; }
+
+  /* ---------- ورود ---------- */
+  #join { margin:auto 0; display:flex; flex-direction:column; gap:20px; }
+  .brand { display:flex; align-items:center; gap:12px; }
+  .brand svg { width:44px; height:44px; flex:none; }
+  .brand h1 { margin:0; font-size:2rem; line-height:1.1; font-weight:800; }
+  .brand p { margin:2px 0 0; color:var(--muted); font-size:.95rem; }
+  .card { background:var(--panel); border-radius:24px; padding:20px; display:flex; flex-direction:column; gap:14px;
+          box-shadow:0 1px 0 var(--edge) inset, 0 12px 28px -12px var(--shadow); }
+  label { display:flex; flex-direction:column; gap:6px; font-size:.9rem; color:var(--muted); }
+  input { background:var(--body); border:2px solid transparent; border-radius:14px; padding:14px 16px; font-size:1.1rem; color:var(--ink); }
+  input:focus { border-color:var(--rx); outline:none; }
+  .power { background:var(--ink); color:var(--body); border:0; border-radius:16px; padding:16px; font-size:1.15rem; font-weight:700; cursor:pointer; }
+  .power:active { transform:translateY(1px); }
+  #err { color:var(--tx); min-height:1.3em; font-size:.9rem; }
+
+  /* ---------- دستگاه ---------- */
+  #app { display:none; flex:1; flex-direction:column; gap:14px; padding:14px 0 18px; min-height:0; }
+  .top { display:flex; align-items:center; justify-content:space-between; }
+  .top b { font-size:1.1rem; }
+  .link { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:.9rem; }
+  .led { width:11px; height:11px; border-radius:50%; background:var(--muted); }
+  .led.ok { background:var(--rx); box-shadow:0 0 0 4px rgba(15,157,140,.25); box-shadow:0 0 0 4px color-mix(in srgb, var(--rx) 25%, transparent); }
+  .led.bad { background:var(--tx); }
+
+  .lcd { background:var(--lcd); color:var(--lcd-ink); border-radius:20px; padding:16px 18px; min-height:112px;
+         display:flex; flex-direction:column; justify-content:space-between;
+         box-shadow:inset 0 3px 8px rgba(0,0,0,.22), 0 0 0 4px var(--panel), 0 0 0 5px var(--edge); }
+  .lcd small { color:var(--lcd-dim); font-size:.85rem; }
+  #who { font-size:1.7rem; font-weight:800; line-height:1.25; overflow-wrap:anywhere; }
+  #who.idle { color:var(--lcd-dim); font-weight:600; font-size:1.3rem; }
+
+  .grille { height:46px; border-radius:14px; background-color:var(--panel);
+            background-image:radial-gradient(circle, var(--edge) 2.4px, transparent 2.9px);
+            background-size:14px 14px; background-position:center; }
+  .grille.rx { background-image:radial-gradient(circle, var(--rx) 2.8px, transparent 3.3px); animation:pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity:.45; } }
+
+  #peers { display:flex; flex-wrap:wrap; gap:8px; }
+  .peer { display:flex; align-items:center; gap:8px; background:var(--panel); padding:7px 12px; border-radius:999px; font-size:.95rem; }
+  .peer i { width:9px; height:9px; border-radius:50%; background:var(--edge); }
+  .peer.talking { outline:2px solid var(--rx); }
+  .peer.talking i { background:var(--rx); }
+  .empty { color:var(--muted); font-size:.95rem; }
+
+  .pad { flex:1; display:grid; place-items:center; min-height:0; }
+  #ptt {
+    width:min(66vw, 270px); aspect-ratio:1; border-radius:50%; border:0; cursor:pointer; touch-action:none;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+    background:radial-gradient(circle at 50% 35%, var(--panel), var(--body) 85%); color:var(--ink);
+    box-shadow:0 0 0 9px var(--panel), 0 0 0 11px var(--edge), 0 18px 34px -6px var(--shadow);
+    transition:box-shadow .12s, background .12s, transform .12s;
+  }
+  #ptt svg { width:54px; height:54px; }
+  #ptt span { font-size:1.2rem; font-weight:800; }
+  #ptt.on { background:var(--tx); color:var(--on-tx); transform:scale(.97);
+            box-shadow:0 0 0 9px var(--panel), 0 0 0 11px var(--tx), 0 6px 14px -4px var(--shadow);
+            box-shadow:0 0 0 9px color-mix(in srgb, var(--tx) 30%, var(--panel)), 0 0 0 11px var(--tx), 0 6px 14px -4px var(--shadow); }
+
+  @media (prefers-reduced-motion: reduce) { .grille.rx { animation:none; } #ptt { transition:none; } }
+  @media (max-height:640px) { .lcd { min-height:92px; } #who { font-size:1.4rem; } }
+
+  /* کانال، صدا و حالت صفحه‌ی سیاه */
+  .stepper { display:flex; align-items:center; gap:4px; background:var(--panel); border-radius:999px; padding:4px; }
+  .stepper button, .vol button, .icon { width:40px; height:40px; border-radius:50%; border:0; background:var(--body); color:var(--ink);
+                                        font-size:1.4rem; line-height:1; cursor:pointer; display:grid; place-items:center; }
+  .stepper button:active, .vol button:active, .icon:active { transform:scale(.92); }
+  .stepper output { min-width:3.2ch; text-align:center; font-size:1.25rem; font-weight:800; font-variant-numeric:tabular-nums; }
+  .icon { width:38px; height:38px; background:var(--panel); }
+  .icon svg { width:20px; height:20px; }
+  .vol { display:flex; align-items:center; gap:10px; }
+  .vol button { flex:none; background:var(--panel); }
+  .vol input { flex:1; padding:0; height:36px; background:none; accent-color:var(--rx); }
+  .vol output { flex:none; min-width:4ch; text-align:center; color:var(--muted); font-size:.9rem; font-variant-numeric:tabular-nums; }
+  #dark { position:fixed; inset:0; z-index:50; background:#000; display:none; touch-action:none; }
+  #dark .hint { position:absolute; inset:0; display:grid; place-items:center; text-align:center; padding:24px; color:#3b3b3b; font-size:1.1rem; line-height:1.9; }
+  #dark .hint.tx { color:#7a3a1f; }
+  #dark button { position:absolute; top:calc(env(safe-area-inset-top) + 12px); inset-inline-start:12px; z-index:2; background:#151515; color:#777;
+                 border:0; border-radius:999px; padding:10px 16px; font-size:.95rem; cursor:pointer; }
+
+  .mode { display:flex; align-items:center; gap:12px; width:100%; background:var(--panel); border:0; border-radius:16px; padding:10px 14px;
+          font-size:1rem; color:var(--ink); cursor:pointer; text-align:start; }
+  .mode .knob { flex:none; width:46px; height:26px; border-radius:999px; background:var(--edge); position:relative; transition:background .15s; }
+  .mode .knob::after { content:""; position:absolute; top:3px; inset-inline-start:3px; width:20px; height:20px; border-radius:50%; background:var(--body); transition:inset-inline-start .15s; }
+  .mode[aria-checked="true"] .knob { background:var(--tx); }
+  .mode[aria-checked="true"] .knob::after { inset-inline-start:23px; background:#fff; }
+  @media (prefers-reduced-motion: reduce) { .mode .knob, .mode .knob::after { transition:none; } }
+  .row { display:flex; gap:10px; }
+  .row .mode { flex:1; width:auto; min-width:0; }
+  .chirp { flex:none; border:0; border-radius:16px; padding:0 18px; background:var(--panel); color:var(--ink); font-size:1rem; font-weight:700; cursor:pointer; }
+  .chirp:active { background:var(--tx); color:#fff; }
+
+  /* ===== طراحی بی‌سیم واقعی ===== */
+  body { background:radial-gradient(130% 70% at 50% 0%, #EEF1F4, #BCC3CB); }
+  @media (prefers-color-scheme: dark) { body { background:radial-gradient(130% 70% at 50% 0%, #232a32, #0b0e11); } }
+  .hero { display:block; width:118px; margin:0 auto -6px; filter:drop-shadow(0 14px 16px rgba(0,0,0,.35)); }
+  #join { margin:auto 0; }
+  .brand { justify-content:center; }
+
+  #app {
+    --panel:#1b1f24; --body:#2b3138; --ink:#eef0f3; --muted:#9aa4af; --edge:#4a525c;
+    --tx:#ff6a33; --rx:#27c2af; --lcd:#b7d1ae; --lcd-ink:#15241a; --lcd-dim:#587360; --shadow:rgba(0,0,0,.6);
+    color:var(--ink);
+    position:relative; margin:62px 0 14px; padding:18px 16px 20px; border-radius:38px;
+    background:
+      radial-gradient(circle at 16px 16px, #7a838d 0 3px, transparent 3.6px),
+      radial-gradient(circle at calc(100% - 16px) 16px, #7a838d 0 3px, transparent 3.6px),
+      radial-gradient(circle at 16px calc(100% - 16px), #7a838d 0 3px, transparent 3.6px),
+      radial-gradient(circle at calc(100% - 16px) calc(100% - 16px), #7a838d 0 3px, transparent 3.6px),
+      linear-gradient(165deg, #3b424b 0%, #262b32 45%, #1b1f24 100%);
+    box-shadow: inset 0 2px 0 rgba(255,255,255,.12), inset 0 -3px 0 rgba(0,0,0,.4), 0 0 0 2px #14181c, 0 26px 40px -14px rgba(0,0,0,.6);
+  }
+  /* آنتن */
+  #app::before { content:""; position:absolute; top:-58px; left:34px; width:20px; height:64px; border-radius:10px 10px 3px 3px;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.25) 0 2px, transparent 2px 7px), linear-gradient(90deg,#20252b,#5a626c 50%,#20252b);
+    box-shadow:0 0 0 1.5px #14181c; z-index:-1; }
+  /* دکمه‌ی گردان بالا */
+  #app::after { content:""; position:absolute; top:-24px; right:40px; width:64px; height:30px; border-radius:10px 10px 4px 4px;
+    background:repeating-linear-gradient(90deg, rgba(0,0,0,.3) 0 2px, transparent 2px 6px), linear-gradient(180deg,#5a626c,#2a2f35);
+    box-shadow:0 0 0 1.5px #14181c, inset 0 2px 0 rgba(255,255,255,.18); z-index:-1; }
+
+  #app .top { padding:0 6px; }
+  #app .lcd { box-shadow: inset 0 3px 10px rgba(0,0,0,.35), 0 0 0 4px #14181c, 0 0 0 6px #4a525c; border-top:4px solid var(--tx); }
+  #app .grille { height:40px; border-radius:12px; background-color:#14181c; background-image:repeating-linear-gradient(90deg, #4a525c 0 3px, transparent 3px 10px);
+    background-size:auto; box-shadow:inset 0 2px 6px rgba(0,0,0,.6); animation:none; }
+  #app .grille.rx { background-image:repeating-linear-gradient(90deg, var(--rx) 0 3px, transparent 3px 10px); animation:pulse 1s ease-in-out infinite; }
+  #app .peer { background:#14181c; }
+  #app .stepper { background:#14181c; box-shadow:inset 0 2px 5px rgba(0,0,0,.6); }
+  #app #ptt { background:radial-gradient(circle at 50% 30%, #3f4751, #20252b 80%);
+    box-shadow:0 0 0 8px #14181c, 0 0 0 11px #4a525c, 0 0 0 13px #14181c, 0 20px 30px -6px rgba(0,0,0,.7), inset 0 3px 0 rgba(255,255,255,.12); }
+  #app #ptt.on { background:radial-gradient(circle at 50% 30%, #ff8a57, #e2501a 85%);
+    box-shadow:0 0 0 8px #14181c, 0 0 0 11px var(--tx), 0 0 0 13px #14181c, 0 0 38px 8px rgba(255,106,51,.35), inset 0 3px 0 rgba(255,255,255,.25); }
+  @media (max-height:700px) { #app { margin-top:54px; padding-top:14px; gap:10px; } #app #ptt { width:min(52vw,210px); } .hero { width:92px; } }
+  @media (prefers-reduced-motion: reduce) { #app .grille.rx { animation:none; } }
+  .mode { padding:8px 14px; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div id="join">
+    <svg class="hero" viewBox="0 0 140 190" aria-hidden="true">
+      <defs>
+        <linearGradient id="gb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a4048"/><stop offset="1" stop-color="#1b1f24"/></linearGradient>
+        <linearGradient id="ga" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2a2f35"/><stop offset=".5" stop-color="#555d67"/><stop offset="1" stop-color="#2a2f35"/></linearGradient>
+        <radialGradient id="gp" cx=".5" cy=".35" r=".7"><stop offset="0" stop-color="#ff8a57"/><stop offset="1" stop-color="#e2501a"/></radialGradient>
+      </defs>
+      <rect x="34" y="2" width="12" height="52" rx="6" fill="url(#ga)"/>
+      <rect x="82" y="22" width="30" height="20" rx="6" fill="url(#ga)"/>
+      <rect x="22" y="40" width="96" height="146" rx="18" fill="url(#gb)" stroke="#4a525c" stroke-width="1.5"/>
+      <g fill="#5b646f"><rect x="36" y="54" width="68" height="3" rx="1.5"/><rect x="36" y="61" width="68" height="3" rx="1.5"/><rect x="36" y="68" width="68" height="3" rx="1.5"/><rect x="36" y="75" width="68" height="3" rx="1.5"/></g>
+      <rect x="34" y="88" width="72" height="34" rx="6" fill="#b7d1ae" stroke="#0e1114" stroke-width="3"/>
+      <text x="70" y="111" text-anchor="middle" font-family="monospace" font-size="18" font-weight="700" fill="#15241a">CH 105</text>
+      <circle cx="70" cy="153" r="22" fill="#14181c"/><circle cx="70" cy="153" r="17" fill="url(#gp)"/>
+      <circle cx="30" cy="48" r="2" fill="#6b747e"/><circle cx="110" cy="48" r="2" fill="#6b747e"/><circle cx="30" cy="178" r="2" fill="#6b747e"/><circle cx="110" cy="178" r="2" fill="#6b747e"/>
+    </svg>
+    <div class="brand">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="12" y="14" width="24" height="31" rx="6" fill="currentColor"/><rect x="29" y="3" width="4" height="14" rx="2" fill="currentColor"/><rect x="16" y="19" width="16" height="8" rx="2" fill="var(--lcd)"/><circle cx="24" cy="36" r="4" fill="var(--tx)"/></svg>
+      <div><h1>بی‌سیم</h1><p>گوشی‌ها را به هم وصل کن</p></div>
+    </div>
+    <div class="card">
+      <label>نام این گوشی<input id="name" placeholder="مثلاً انبار" maxlength="30" autocomplete="off"></label>
+      <label>شماره‌ی کانال (۱۰۰ تا ۱۲۰)<input id="room" type="number" inputmode="numeric" min="100" max="120" value="100" dir="ltr" style="text-align:right"></label>
+      <label id="codeRow" style="display:none">رمز ورود<input id="code" type="password" autocomplete="off" dir="ltr" style="text-align:right"></label>
+      <button class="power" id="go">ورود به کانال</button>
+      <div id="err" role="alert"></div>
+    </div>
+  </div>
+
+  <div id="app">
+    <div class="top">
+      <div class="stepper" role="group" aria-label="کانال">
+        <button id="chDown" aria-label="کانال قبلی">−</button>
+        <output id="chNum" aria-live="polite">۱۰۰</output>
+        <button id="chUp" aria-label="کانال بعدی">+</button>
+      </div>
+      <div class="link">
+        <span id="status">در حال اتصال…</span><span class="led" id="led"></span>
+        <button class="icon" id="dim" aria-label="صفحه‌ی سیاه">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="lcd">
+      <small id="count">&nbsp;</small>
+      <div id="who" class="idle">کانال آزاد</div>
+    </div>
+    <div class="grille" id="grille" aria-hidden="true"></div>
+    <div id="peers"></div>
+    <div class="vol">
+      <button id="vDown" aria-label="کم کردن صدا">−</button>
+      <input id="vol" type="range" min="0" max="100" step="5" value="100" aria-label="بلندی صدا">
+      <button id="vUp" aria-label="زیاد کردن صدا">+</button>
+      <output id="vNum">۱۰۰٪</output>
+    </div>
+    <div class="row">
+      <button class="mode" id="open" role="switch" aria-checked="false"><span class="knob"></span><span>میکروفون همیشه روشن</span></button>
+      <button class="chirp" id="crk" aria-label="خش‌خش">خش‌خش</button>
+    </div>
+    <button class="mode" id="auto" role="switch" aria-checked="false"><span class="knob"></span><span>خش‌خش خودکار اول مکالمه</span></button>
+    <div class="pad">
+      <button id="ptt" aria-label="نگه دار و صحبت کن">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/></svg>
+        <span id="pttLabel">نگه دار و صحبت کن</span>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<div id="dark">
+  <button id="darkExit">بازگشت</button>
+  <div class="hint" id="darkHint">هر جای صفحه را نگه دار و صحبت کن</div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let ws, myId, stream, wakeLock, myName = '', iTalk = false;
+let channel = 100, volume = 100;
+const peers = {}; // id -> {pc, name, audio}
+const talkingIds = new Set();
+// روی شبکه‌ی محلی (آدرس IP یا localhost) نیازی به STUN نیست؛ روی هاست آنلاین استفاده می‌شود
+const IS_LOCAL = /^(\d+\.){3}\d+$|^localhost$/.test(location.hostname);
+let ICE = IS_LOCAL ? [] : [{ urls: 'stun:stun.l.google.com:19302' }];
+async function loadIce() {
+  if (IS_LOCAL) return;
+  try { const r = await fetch('/ice', { cache: 'no-store' }); const a = await r.json(); if (Array.isArray(a) && a.length) ICE = a; } catch {}
+}
+const fa = (n) => n.toLocaleString('fa-IR');
+const clampCh = (n) => Math.min(120, Math.max(100, Math.round(Number(n)) || 100));
+const store = {
+  get: (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }
+};
+
+$('name').value = store.get('walkie-name', '');
+$('room').value = clampCh(store.get('walkie-channel', 100));
+volume = Math.min(100, Math.max(0, Number(store.get('walkie-volume', 100))));
+if (!IS_LOCAL) { $('codeRow').style.display = ''; $('code').value = store.get('walkie-code', ''); }
+$('go').onclick = join;
+
+async function join() {
+  const name = $('name').value.trim() || 'گوشی ' + fa(Math.floor(Math.random() * 100));
+  channel = clampCh($('room').value);
+  myName = name;
+  store.set('walkie-name', name);
+  store.set('walkie-channel', channel);
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    });
+  } catch (e) {
+    $('err').textContent = 'میکروفون در دسترس نیست. آدرس باید با https شروع شود و اجازه‌ی میکروفون را بدهید.';
+    return;
+  }
+  initAudio();
+  if (!IS_LOCAL) store.set('walkie-code', $('code').value);
+  await loadIce();
+  stream.getAudioTracks().forEach(t => t.enabled = false);
+  $('join').style.display = 'none';
+  $('app').style.display = 'flex';
+  showChannel(); showVolume();
+  renderPeers();
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+  connect();
+}
+
+// ---------- کانال ----------
+function showChannel() { $('chNum').textContent = fa(channel); renderPeers(); }
+
+function switchChannel(n) {
+  n = clampCh(n);
+  if (n === channel) return;
+  talk(false);
+  channel = n;
+  store.set('walkie-channel', n);
+  const old = ws; ws = null;
+  if (old) try { old.close(); } catch {}
+  leaveAll();
+  showChannel();
+  setLink(false, 'در حال اتصال…');
+  connect();
+}
+$('chUp').onclick = () => switchChannel(channel + 1);
+$('chDown').onclick = () => switchChannel(channel - 1);
+
+// ---------- صدا ----------
+function showVolume() {
+  $('vol').value = volume;
+  $('vNum').textContent = fa(volume) + '٪';
+  for (const p of Object.values(peers)) p.audio.volume = volume / 100;
+}
+function setVolume(v) {
+  volume = Math.min(100, Math.max(0, v));
+  store.set('walkie-volume', volume);
+  showVolume();
+}
+$('vol').oninput = (e) => setVolume(Number(e.target.value));
+$('vUp').onclick = () => setVolume(volume + 10);
+$('vDown').onclick = () => setVolume(volume - 10);
+
+// ---------- اتصال ----------
+function setLink(ok, text) {
+  $('status').textContent = text;
+  $('led').className = 'led ' + (ok ? 'ok' : 'bad');
+}
+
+function connect() {
+  const room = 'ch' + channel;
+  const sock = new WebSocket('wss://' + location.host);
+  ws = sock;
+  sock.onopen = () => { if (ws !== sock) return; setLink(true, 'متصل'); sock.send(JSON.stringify({ type: 'join', name: myName, room, code: IS_LOCAL ? '' : $('code').value })); if (iTalk) sock.send(JSON.stringify({ type: 'talking', on: true })); };
+  sock.onclose = () => {
+    if (ws !== sock) return;
+    setLink(false, 'قطع شد؛ تلاش مجدد…');
+    leaveAll();
+    setTimeout(() => { if (ws === sock) connect(); }, 2000);
+  };
+  sock.onmessage = async (ev) => {
+    if (ws !== sock) return;
+    const m = JSON.parse(ev.data);
+    if (m.type === 'denied') {
+      ws = null; leaveAll();
+      try { stream.getTracks().forEach(t => t.stop()); } catch {}
+      stream = null; iTalk = false; openMic = false;
+      $('app').style.display = 'none'; $('join').style.display = '';
+      $('err').textContent = 'رمز ورود اشتباه است.';
+    }
+    else if (m.type === 'full') { setLink(false, 'کانال پر است'); }
+    else if (m.type === 'welcome') {
+      myId = m.id;
+      for (const p of m.peers) { addPeer(p.id, p.name); await makeOffer(p.id); }
+    }
+    else if (m.type === 'peer-joined') addPeer(m.id, m.name);
+    else if (m.type === 'peer-left') removePeer(m.id);
+    else if (m.type === 'offer') {
+      const p = peers[m.from]; if (!p) return;
+      await p.pc.setRemoteDescription(m.data);
+      const ans = await p.pc.createAnswer();
+      await p.pc.setLocalDescription(ans);
+      send({ type: 'answer', to: m.from, data: p.pc.localDescription });
+    }
+    else if (m.type === 'answer') { const p = peers[m.from]; if (p) await p.pc.setRemoteDescription(m.data); }
+    else if (m.type === 'ice') { const p = peers[m.from]; if (p) try { await p.pc.addIceCandidate(m.data); } catch {} }
+    else if (m.type === 'talking') markTalking(m.id, m.on);
+    else if (m.type === 'crackle') playCrackle();
+  };
+}
+
+const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
+
+function addPeer(id, name) {
+  if (peers[id]) return;
+  const pc = new RTCPeerConnection({ iceServers: ICE });
+  stream.getTracks().forEach(t => pc.addTrack(t, stream));
+  const audio = document.createElement('audio');
+  audio.autoplay = true; audio.playsInline = true; audio.volume = volume / 100;
+  document.body.appendChild(audio);
+  pc.onicecandidate = (e) => e.candidate && send({ type: 'ice', to: id, data: e.candidate });
+  pc.ontrack = (e) => { audio.srcObject = e.streams[0]; audio.play().catch(() => {}); };
+  peers[id] = { pc, name, audio };
+  renderPeers();
+}
+
+async function makeOffer(id) {
+  const p = peers[id];
+  const offer = await p.pc.createOffer();
+  await p.pc.setLocalDescription(offer);
+  send({ type: 'offer', to: id, data: p.pc.localDescription });
+}
+
+function dropPeer(id) {
+  const p = peers[id]; if (!p) return;
+  try { p.pc.close(); } catch {}
+  p.audio.remove(); delete peers[id];
+  talkingIds.delete(id);
+}
+function removePeer(id) { dropPeer(id); renderPeers(); updateLcd(); }
+function leaveAll() { Object.keys(peers).forEach(dropPeer); talkingIds.clear(); renderPeers(); updateLcd(); }
+
+function renderPeers() {
+  const box = $('peers');
+  box.innerHTML = '';
+  const ids = Object.keys(peers);
+  $('count').textContent = 'کانال ' + fa(channel) + ' · ' + fa(ids.length + 1) + ' نفر';
+  if (!ids.length) {
+    const e = document.createElement('div');
+    e.className = 'empty'; e.textContent = 'هنوز کسی دیگر در این کانال نیست.';
+    box.appendChild(e); return;
+  }
+  for (const id of ids) {
+    const d = document.createElement('div');
+    d.className = 'peer' + (talkingIds.has(id) ? ' talking' : '');
+    d.id = 'peer-' + id;
+    const dot = document.createElement('i');
+    const t = document.createElement('span'); t.textContent = peers[id].name;
+    d.append(dot, t);
+    box.appendChild(d);
+  }
+}
+
+function markTalking(id, on) {
+  on ? talkingIds.add(id) : talkingIds.delete(id);
+  const el = $('peer-' + id); if (el) el.classList.toggle('talking', on);
+  updateLcd();
+}
+
+function updateLcd() {
+  const who = $('who');
+  const first = [...talkingIds].find(id => peers[id]);
+  $('grille').classList.toggle('rx', !!first);
+  let text = 'کانال آزاد', idle = true;
+  if (iTalk) { text = 'در حال ارسال…'; idle = false; }
+  else if (first) { text = peers[first].name; idle = false; }
+  who.textContent = text; who.className = idle ? 'idle' : '';
+  const dh = $('darkHint');
+  dh.textContent = iTalk ? 'در حال ارسال…' : (first ? peers[first].name : 'هر جای صفحه را نگه دار و صحبت کن');
+  dh.classList.toggle('tx', iTalk);
+}
+
+// ---------- دکمه‌ی صحبت ----------
+const ptt = $('ptt');
+// ---------- خش‌خش بی‌سیم (۱ ثانیه) ----------
+let actx, lastCrackle = 0;
+function initAudio() {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+  } catch (e) {}
+}
+function playCrackle() {
+  try {
+    initAudio();
+    const sr = actx.sampleRate, n = Math.floor(sr * 1.0);
+    const buf = actx.createBuffer(1, n, sr), d = buf.getChannelData(0);
+    const step = Math.floor(sr * 0.012);
+    let gate = 1;
+    for (let i = 0; i < n; i++) {
+      if (i % step === 0) gate = Math.random() < 0.7 ? 1 : 0.12;   // قطع‌ووصل‌های کوتاه = حالت خش‌خش
+      const env = Math.pow(1 - i / n, 1.4);                          // کم‌کم محو می‌شود
+      d[i] = (Math.random() * 2 - 1) * gate * env;
+    }
+    const src = actx.createBufferSource(); src.buffer = buf;
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 0.6;
+    const g = actx.createGain(); g.gain.value = 0.15 + 0.35 * (volume / 100);
+    src.connect(bp); bp.connect(g); g.connect(actx.destination);
+    src.start();
+  } catch (e) {}
+}
+// دکمه‌ی جدا: روی همه‌ی گوشی‌های کانال، ۱ ثانیه خش‌خش پخش می‌شود
+function fireCrackle() { playCrackle(); send({ type: 'crackle' }); }
+$('crk').onclick = () => {
+  const now = Date.now();
+  if (now - lastCrackle < 1100) return;
+  lastCrackle = now;
+  fireCrackle();
+};
+// کلید «خش‌خش خودکار»: اگر روشن باشد، اول هر مکالمه ۱ ثانیه خش‌خش پخش می‌شود
+let autoCrackle = store.get('walkie-auto', '0') === '1';
+$('auto').setAttribute('aria-checked', String(autoCrackle));
+$('auto').onclick = () => {
+  autoCrackle = !autoCrackle;
+  store.set('walkie-auto', autoCrackle ? '1' : '0');
+  $('auto').setAttribute('aria-checked', String(autoCrackle));
+  if (autoCrackle) playCrackle(); // نمونه‌ی صدا هنگام روشن کردن
+};
+
+let openMic = false;
+function setTx(on) {
+  if (!stream) return;
+  const changed = iTalk !== on;
+  iTalk = on;
+  stream.getAudioTracks().forEach(t => t.enabled = on);
+  ptt.classList.toggle('on', on);
+  $('pttLabel').textContent = on ? (openMic ? 'میکروفون باز است' : 'در حال ارسال') : 'نگه دار و صحبت کن';
+  if (changed) { send({ type: 'talking', on }); if (on) { if (autoCrackle) fireCrackle(); if (navigator.vibrate) navigator.vibrate(30); } }
+  updateLcd();
+}
+// نگه‌داشتن دکمه؛ وقتی «میکروفون همیشه روشن» فعال است نادیده گرفته می‌شود
+function talk(on) { if (openMic) return; setTx(on); }
+function setOpenMic(v) {
+  if (!stream) return;
+  openMic = v;
+  $('open').setAttribute('aria-checked', String(v));
+  setTx(v);
+}
+$('open').onclick = () => setOpenMic(!openMic);
+function holdToTalk(el) {
+  el.addEventListener('pointerdown', (e) => { if (e.target.tagName === 'BUTTON' && el.id === 'dark') return; e.preventDefault(); el.setPointerCapture(e.pointerId); talk(true); });
+  ['pointerup', 'pointercancel'].forEach(ev => el.addEventListener(ev, () => talk(false)));
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+holdToTalk(ptt);
+
+// ---------- صفحه‌ی سیاه (صفحه روشن می‌ماند ولی همه‌جا سیاه است) ----------
+holdToTalk($('dark'));
+$('dim').onclick = () => { $('dark').style.display = 'block'; };
+$('darkExit').onclick = (e) => { e.stopPropagation(); $('dark').style.display = 'none'; };
+
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && stream) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch {} }
+});
+</script>
+</body>
+</html>
